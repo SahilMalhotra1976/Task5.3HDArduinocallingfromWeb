@@ -2,79 +2,98 @@
 #include <WiFiSSLClient.h>
 #include <ArduinoHttpClient.h>
 
-// WiFi credentials
+// WiFi =
 char wifiSSID[] = "AK";
 char wifiPassword[] = "vasu@8556";
 
-// Firebase Realtime Database configuration
+
 char firebaseHost[] = "ledcontrol-8e81e-default-rtdb.firebaseio.com";
 int firebasePort = 443;
 
-// Database paths for LED controls
+
 String pathBlueLED = "/leds/blue.json";
 String pathGreenLED = "/leds/green.json";
 String pathRedLED = "/leds/red.json";
 
-// Assign pins for LEDs
+// LED pins
 const int pinBlue = 2;
 const int pinGreen = 3;
 const int pinRed = 4;
 
-// Create WiFi and HTTP client instances
+// Track previous LED states
+String prevBlueState = "";
+String prevGreenState = "";
+String prevRedState = "";
+
+// Create clients
 WiFiSSLClient sslClient;
 HttpClient httpClient = HttpClient(sslClient, firebaseHost, firebasePort);
 
+ //Define callback function type
+typedef void (*LEDCallback)(int ledPin, const String &state);
+
+
 void setup() {
   Serial.begin(9600);
-
-  // Configure LED pins as outputs
   pinMode(pinBlue, OUTPUT);
   pinMode(pinGreen, OUTPUT);
   pinMode(pinRed, OUTPUT);
 
-  // Attempt WiFi connection
+  // Connect to WiFi
   WiFi.begin(wifiSSID, wifiPassword);
   while (WiFi.status() != WL_CONNECTED) {
-    Serial.println("Trying to connect to WiFi...");
+    Serial.println("Connecting to WiFi...");
     delay(1000);
   }
 
-  Serial.println("WiFi Connected Successfully!");
+  Serial.println("Connected to WiFi!");
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 }
 
+
 void loop() {
-  // Continuously update LED states from Firebase
-  updateLEDState(pathBlueLED, pinBlue);
-  updateLEDState(pathGreenLED, pinGreen);
-  updateLEDState(pathRedLED, pinRed);
-  
-  delay(1000); // Check every second
+  // Check and call callback only if state changes
+  checkLEDStateChange(pathBlueLED, pinBlue, prevBlueState, handleLEDChange);
+  checkLEDStateChange(pathGreenLED, pinGreen, prevGreenState, handleLEDChange);
+  checkLEDStateChange(pathRedLED, pinRed, prevRedState, handleLEDChange);
+
+  delay(1000);  // Poll every second
 }
 
-void updateLEDState(String dbPath, int ledPin) {
+ //callback trigger function 
+void checkLEDStateChange(String dbPath, int ledPin, String &prevState, LEDCallback callback) {
   httpClient.get(dbPath);
-  int responseCode = httpClient.responseStatusCode();
-  String payload = httpClient.responseBody();
-  payload.trim(); // Remove any extra spaces/newlines
+  int statusCode = httpClient.responseStatusCode();
+  String response = httpClient.responseBody();
 
-  Serial.print("Requesting: ");
+  response.trim();
+  response.replace("\"", ""); // remove quotes
+
+  Serial.print("Checking path: ");
   Serial.println(dbPath);
-  Serial.print("HTTP Status: ");
-  Serial.println(responseCode);
-  Serial.print("Payload: ");
-  Serial.println(payload);
+  Serial.print("Status: ");
+  Serial.println(statusCode);
+  Serial.print("Response: ");
+  Serial.println(response);
 
-  if (responseCode == 200) {
-    payload.replace("\"", ""); // Remove quotes if present
-
-    if (payload == "true") {
-      digitalWrite(ledPin, HIGH);
-    } else {
-      digitalWrite(ledPin, LOW);
-    }
-  } else {
-    Serial.println("Error fetching data from Firebase");
+  if (statusCode == 200 && response != prevState) {
+    prevState = response;
+    callback(ledPin, response); // invoke callback function
   }
 }
+
+// === The callback function ===
+void handleLEDChange(int ledPin, const String &state) {
+  if (state == "true") {
+    digitalWrite(ledPin, HIGH);
+    Serial.print("LED ON at pin ");
+  } else {
+    digitalWrite(ledPin, LOW);
+    Serial.print("LED OFF at pin ");
+  }
+  Serial.println(ledPin);
+}
+
+  
+  
