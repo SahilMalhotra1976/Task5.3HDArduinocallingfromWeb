@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Traffic Light Control Panel</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 40px;
+      background-color: #f9f9f9;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 30px;
+      color: #333;
+    }
+
+    .led-toggle {
+      margin-bottom: 15px;
+      font-size: 18px;
+    }
+
+    input[type="checkbox"] {
+      margin-right: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Remote Traffic Light Control</h1>
+
+  <label class="led-toggle">
+    <input type="checkbox" onchange="toggleLED('red', this.checked)">
+    Red Light
+  </label>
+
+  <label class="led-toggle">
+    <input type="checkbox" onchange="toggleLED('green', this.checked)">
+    Green Light
+  </label>
+
+  <label class="led-toggle">
+    <input type="checkbox" onchange="toggleLED('blue', this.checked)">
+    Blue Light
+  </label>
+
+  <script>
+    const firebaseURL = 'https://ledcontrol-8e81e-default-rtdb.firebaseio.com/leds';
+
+    function toggleLED(color, state) {
+      const url = `${firebaseURL}/${color}.json`;
+
+      fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(state)
+      })
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`Failed to update ${color} LED`);
+        }
+        return res.json();
+      })
+      .then(() => {
+        console.log(`${color.toUpperCase()} LED set to ${state ? 'ON' : 'OFF'}`);
+      })
+      .catch(err => {
+        console.error('LED update error:', err);
+      });
+    }
+  </script>
+
+</body>
+</html>
